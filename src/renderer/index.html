@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accord</title>
+  <script>
+    try {
+      if (window.localStorage.getItem("crossqc-theme") === "light") {
+        document.documentElement.dataset.theme = "light";
+      }
+    } catch (error) {
+      // Ignore storage access failures during early boot.
+    }
+  </script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="grid-backdrop"></div>
+  <div class="glow glow-a"></div>
+  <div class="glow glow-b"></div>
+
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="header-logo">QC</div>
+        <div class="brand-block">
+          <p class="eyebrow">Accord</p>
+          <div class="brand-line">
+            <h1>Pipeline Console</h1>
+            <span class="build-pill">Electron wrapper for `accord.ps1`</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-spacer"></div>
+      <div class="header-status">
+        <span id="headerStatusDot" class="status-dot idle"></span>
+        <span id="headerStatusText">No session selected</span>
+      </div>
+      <div class="header-actions-right">
+        <div class="topbar-action-group">
+          <button
+            id="themeToggle"
+            class="btn-icon topbar-icon-button"
+            type="button"
+            aria-label="Switch to light theme"
+            aria-pressed="false"
+            title="Switch to light theme"
+          >
+            &#9790;
+          </button>
+          <button id="openHelp" class="secondary-button utility-button topbar-help" type="button">Help</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-body">
+      <aside class="left-panel">
+        <div class="panel-tabs">
+          <button id="leftTabSessions" class="panel-tab active" type="button" data-left-panel="sessions">Sessions</button>
+          <button id="leftTabWizard" class="panel-tab" type="button" data-left-panel="wizard">Wizard</button>
+          <button id="leftTabConfigure" class="panel-tab" type="button" data-left-panel="configure">Advanced</button>
+        </div>
+
+        <section id="leftPanelSessions" class="panel-content active">
+          <div class="panel-toolbar">
+            <div>
+              <p class="label-xs">Workspace</p>
+              <h2>Session Rail</h2>
+            </div>
+            <button id="refreshSessions" class="secondary-button utility-button" type="button">Refresh</button>
+          </div>
+          <div id="sessionSummary" class="session-summary"></div>
+          <button id="newProjectAction" class="new-project-button" type="button">
+            <span class="new-project-icon">+</span>
+            <span>New Project</span>
+          </button>
+          <details class="project-history-panel">
+            <summary>
+              <span>Previous Projects</span>
+              <span id="projectHistoryCount" class="project-history-count">0</span>
+            </summary>
+            <div id="projectHistoryList" class="project-history-list"></div>
+          </details>
+          <div id="sessionsList" class="sessions-list"></div>
+        </section>
+
+        <section id="leftPanelConfigure" class="panel-content">
+          <div class="panel-toolbar">
+            <div>
+              <p class="label-xs">Pipeline</p>
+              <h2>Configure Run</h2>
+            </div>
+            <button id="checkEnvironment" class="secondary-button utility-button" type="button">Check Environment</button>
+          </div>
+
+          <form id="runForm" class="configure-content">
+            <div class="config-block">
+              <div class="config-group">
+                <label class="field">
+                  <span>Workspace Directory <small style="color:var(--text-muted);font-weight:normal">(your target project)</small></span>
+                  <div class="field-row">
+                    <input id="workspaceDir" type="text" spellcheck="false" placeholder="C:\path\to\your-project">
+                    <button id="browseWorkspace" class="secondary-button utility-button browse-button" type="button">Browse</button>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Plan File</span>
+                  <div class="field-row">
+                    <input id="planFile" type="text" spellcheck="false" placeholder="C:\path\to\plan.md">
+                    <button id="browsePlanFile" class="secondary-button utility-button browse-button" type="button">Browse</button>
+                    <button id="newMetaPlan" class="secondary-button utility-button new-plan-button" type="button" title="Create a new meta-plan from a template">+ New</button>
+                    <button id="editPlanFile" class="secondary-button utility-button" type="button" title="Open the selected plan file in the editor">Edit</button>
+                  </div>
+                </label>
+              </div>
+
+              <div class="quick-grid">
+                <label class="field field-compact">
+                  <span>QC Type</span>
+                  <select id="qcType">
+                    <option value="code">code</option>
+                    <option value="document">document</option>
+                  </select>
+                </label>
+
+                <label class="field field-compact">
+                  <span>Reasoning Effort</span>
+                  <select id="reasoningEffort">
+                    <option value="xhigh">xhigh</option>
+                    <option value="high">high</option>
+                    <option value="medium">medium</option>
+                    <option value="low">low</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="flags-group">
+                <div class="label-xs flags-legend">Flags</div>
+                <div class="flags-row">
+                  <label class="toggle-chip">
+                    <input id="deliberationMode" type="checkbox">
+                    <span>Deliberation Mode</span>
+                  </label>
+                  <label class="toggle-chip">
+                    <input id="skipPlanQC" type="checkbox">
+                    <span>Skip Plan QC</span>
+                  </label>
+                  <label class="toggle-chip">
+                    <input id="passOnMediumOnly" type="checkbox">
+                    <span>Pass On Medium Only</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <details class="advanced-panel">
+              <summary>Advanced and environment</summary>
+              <div class="advanced-grid">
+                <label class="field">
+                  <span>Prompt Directory</span>
+                  <div class="field-row">
+                    <input id="promptDir" type="text" spellcheck="false">
+                    <button id="browsePromptDir" class="secondary-button utility-button browse-button" type="button">Browse</button>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span title="Max Iterations">Max Iterations</span>
+                  <input id="maxIterations" type="number" min="1" max="100" value="10">
+                </label>
+
+                <label class="field">
+                  <span title="Max Plan QC Iterations">Max Plan QC Iterations</span>
+                  <input id="maxPlanQCIterations" type="number" min="1" max="20" value="5">
+                </label>
+
+                <label class="field">
+                  <span title="Claude QC Iterations">Claude QC Iterations</span>
+                  <input id="claudeQCIterations" type="number" min="0" max="20" value="0">
+                </label>
+
+                <label class="field">
+                  <span title="History Iterations">History Iterations</span>
+                  <input id="historyIterations" type="number" min="1" max="10" value="2">
+                </label>
+
+                <label class="field">
+                  <span title="Max Deliberation Rounds">Max Deliberation Rounds</span>
+                  <input id="maxDeliberationRounds" type="number" min="2" max="10" value="4">
+                </label>
+
+                <label class="field">
+                  <span title="Max Retries">Max Retries</span>
+                  <input id="maxRetries" type="number" min="0" max="10" value="3">
+                </label>
+
+                <label class="field">
+                  <span title="Retry Delay (seconds)">Retry Delay (s)</span>
+                  <input id="retryDelaySec" type="number" min="5" max="300" value="30">
+                </label>
+              </div>
+              <div id="environmentPanel" class="environment-panel"></div>
+            </details>
+
+            <div class="config-actions">
+              <div class="primary-actions">
+                <div class="primary-actions-row">
+                  <button class="primary-button action-button" type="submit">Start Run</button>
+                  <button id="reviewMetaPlan" class="review-meta-button action-button" type="button" title="Review the selected meta plan against the bundled checklist and write a sibling *.reviewed.md file">Review Meta Plan</button>
+                </div>
+                <div class="primary-actions-secondary">
+                  <button id="resumeSelected" class="secondary-button action-button" type="button">Resume</button>
+                  <button id="cancelSelected" class="danger-button action-button" type="button">Cancel</button>
+                </div>
+                <p class="config-actions-hint">Resume ignores current form values and uses the selected session config. Review Meta Plan keeps the original file unchanged and writes a sibling <code>*.reviewed.md</code>.</p>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section id="leftPanelWizard" class="panel-content">
+          <div class="panel-toolbar">
+            <div>
+              <p class="label-xs">Guided</p>
+              <h2>Project Wizard</h2>
+            </div>
+          </div>
+
+          <div id="wizardStepIndicator" class="wizard-steps">
+            <div class="wizard-step active" data-step="1">
+              <span class="wizard-step-number">1</span>
+              <span class="wizard-step-label">Plan</span>
+            </div>
+            <div class="wizard-step-connector"></div>
+            <div class="wizard-step" data-step="2">
+              <span class="wizard-step-number">2</span>
+              <span class="wizard-step-label">Review</span>
+            </div>
+            <div class="wizard-step-connector"></div>
+            <div class="wizard-step" data-step="3">
+              <span class="wizard-step-number">3</span>
+              <span class="wizard-step-label">Cycle</span>
+            </div>
+            <div class="wizard-step-connector"></div>
+            <div class="wizard-step" data-step="4">
+              <span class="wizard-step-number">4</span>
+              <span class="wizard-step-label">Build</span>
+            </div>
+          </div>
+
+          <div id="wizardSettings" class="wizard-settings" hidden>
+            <label class="field">
+              <span>Thinking Depth <span class="wizard-field-hint" title="Higher settings produce better results but use more tokens and cost more">?</span></span>
+              <select id="wizardReasoningEffort">
+                <option value="low">Low — fastest, cheapest</option>
+                <option value="medium">Medium — balanced</option>
+                <option value="high" selected>High — recommended</option>
+                <option value="xhigh">Max — best quality, highest cost</option>
+              </select>
+            </label>
+
+            <details class="wizard-fine-tuning">
+              <summary>Fine Tuning</summary>
+              <div class="wizard-fine-tuning-body">
+                <label class="field">
+                  <span>QC Rounds <span class="wizard-field-hint" title="Maximum number of write-review-fix cycles before stopping. More rounds = better quality but higher cost.">?</span></span>
+                  <input id="wizardMaxIterations" type="number" min="1" max="100" value="10">
+                </label>
+                <label class="field">
+                  <span>Plan Checks <span class="wizard-field-hint" title="Maximum iterations to improve plan quality during plan QC phase.">?</span></span>
+                  <input id="wizardMaxPlanQCIterations" type="number" min="1" max="20" value="5">
+                </label>
+                <label class="field">
+                  <span>Ctx History <span class="wizard-field-hint" title="Number of previous iterations included as context for the AI. More context = smarter fixes but uses more tokens.">?</span></span>
+                  <input id="wizardHistoryIterations" type="number" min="1" max="10" value="2">
+                </label>
+                <label class="field">
+                  <span>Review Passes <span class="wizard-field-hint" title="Additional AI review passes for more thorough quality checking. Set to 0 for default behavior.">?</span></span>
+                  <input id="wizardClaudeQCIterations" type="number" min="0" max="20" value="0">
+                </label>
+                <label class="toggle-chip wizard-toggle-chip" title="Allow QC to pass with medium confidence instead of requiring high. Faster but less rigorous.">
+                  <input id="wizardPassOnMediumOnly" type="checkbox">
+                  <span>Medium Confidence</span>
+                </label>
+              </div>
+            </details>
+          </div>
+
+          <div id="wizardStep1" class="wizard-step-content active">
+            <div class="wizard-step-body">
+              <h3 class="wizard-heading">Describe Your Project</h3>
+              <p class="wizard-hint">Tell us what you want to build. We'll turn it into a structured plan.</p>
+
+              <label class="field">
+                <span>Project Folder</span>
+                <div class="field-row">
+                  <input id="wizardWorkspaceDir" type="text" spellcheck="false" placeholder="C:\path\to\your-project">
+                  <button id="wizardBrowseWorkspace" class="secondary-button utility-button browse-button" type="button">Browse</button>
+                </div>
+              </label>
+
+              <div class="wizard-plan-source">
+                <button id="wizardStartFresh" class="wizard-source-btn active" type="button">Start Fresh</button>
+                <button id="wizardLoadExisting" class="wizard-source-btn" type="button">Load Existing</button>
+              </div>
+
+              <div id="wizardFreshForm" class="wizard-fresh-form">
+                <label class="field">
+                  <span>Project Title</span>
+                  <input id="wizardProjectTitle" type="text" placeholder="My Awesome App">
+                </label>
+                <label class="field">
+                  <span>What does it do?</span>
+                  <textarea id="wizardGoal" rows="2" placeholder="A dashboard that shows real-time sales data..."></textarea>
+                </label>
+                <label class="field">
+                  <span>Key features (one per line)</span>
+                  <textarea id="wizardFeatures" rows="3" placeholder="Login page with email/password&#10;Dashboard with charts&#10;Export to CSV"></textarea>
+                </label>
+                <label class="field">
+                  <span>Tech constraints (optional)</span>
+                  <textarea id="wizardConstraints" rows="2" placeholder="Must use React, PostgreSQL..."></textarea>
+                </label>
+                <label class="field">
+                  <span>Existing code to know about (optional)</span>
+                  <textarea id="wizardContext" rows="2" placeholder="API at /api/v2, docs in /docs..."></textarea>
+                </label>
+              </div>
+
+              <div id="wizardLoadArea" class="wizard-load-area" hidden>
+                <div class="field-row">
+                  <input id="wizardLoadPlanPath" type="text" spellcheck="false" placeholder="Select your existing plan file...">
+                  <button id="wizardBrowsePlan" class="secondary-button utility-button browse-button" type="button">Browse</button>
+                </div>
+                <div id="wizardLoadPreview" class="wizard-preview"></div>
+              </div>
+            </div>
+
+            <div class="wizard-step-actions">
+              <button id="wizardSavePlan" class="primary-button action-button wizard-primary" type="button">Save Plan &amp; Continue</button>
+              <button id="wizardOpenEditor" class="secondary-button action-button" type="button">Open Full Editor</button>
+              <div id="wizardStep1Status" class="wizard-status"></div>
+            </div>
+          </div>
+
+          <div id="wizardStep2" class="wizard-step-content">
+            <div class="wizard-step-body">
+              <h3 class="wizard-heading">Review Your Plan</h3>
+              <p class="wizard-hint">The AI checks your plan for completeness and clarity. You can edit and re-review as needed.</p>
+              <div id="wizardPlanSummary" class="wizard-summary-card"></div>
+              <div id="wizardReviewResult" class="wizard-review-result" hidden></div>
+            </div>
+            <div class="wizard-step-actions">
+              <button id="wizardReviewPlan" class="primary-button action-button wizard-primary" type="button">Review My Plan</button>
+              <button id="wizardEditPlan" class="secondary-button action-button wizard-btn-edit" type="button">Edit Plan</button>
+              <button id="wizardSkipReview" class="secondary-button action-button wizard-btn-skip" type="button">Skip Review</button>
+              <div id="wizardStep2Status" class="wizard-status"></div>
+            </div>
+          </div>
+
+          <div id="wizardStep3" class="wizard-step-content">
+            <div class="wizard-step-body">
+              <h3 class="wizard-heading">Generate Development Cycle</h3>
+              <p class="wizard-hint">Creates a detailed implementation plan for the next piece of your project.</p>
+              <div id="wizardCycleInfo" class="wizard-summary-card"></div>
+              <div id="wizardCycleHistory" class="wizard-cycle-history"></div>
+            </div>
+            <div class="wizard-step-actions">
+              <button id="wizardGenerateCycle" class="primary-button action-button wizard-primary" type="button">Generate Next Cycle</button>
+              <button id="wizardBackToReview" class="secondary-button action-button" type="button">Back to Plan</button>
+              <div id="wizardStep3Status" class="wizard-status"></div>
+            </div>
+          </div>
+
+          <div id="wizardStep4" class="wizard-step-content">
+            <div class="wizard-step-body">
+              <h3 class="wizard-heading">Build This Cycle</h3>
+              <p class="wizard-hint">The AI writes the code and keeps improving until quality checks pass.</p>
+              <div id="wizardImplementInfo" class="wizard-summary-card"></div>
+              <div id="wizardImplementResult" class="wizard-implement-result" hidden></div>
+            </div>
+            <div class="wizard-step-actions">
+              <button id="wizardImplementCycle" class="primary-button action-button wizard-primary" type="button">Start Building</button>
+              <button id="wizardNextCycle" class="secondary-button action-button" type="button" hidden>Generate Next Cycle</button>
+              <button id="wizardBackToGenerate" class="secondary-button action-button" type="button">Back</button>
+              <div id="wizardStep4Status" class="wizard-status"></div>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <div id="panelResizer" class="panel-resizer"></div>
+
+      <section class="right-panel">
+        <div class="right-tabs">
+          <button id="rightTabDashboard" class="right-tab active" type="button" data-right-panel="dashboard">
+            Dashboard
+            <span id="dashboardCount" class="tab-count">0</span>
+          </button>
+          <button id="rightTabArtifacts" class="right-tab" type="button" data-right-panel="artifacts">
+            Artifacts
+            <span id="artifactCount" class="tab-count">0</span>
+          </button>
+          <button id="rightTabEvents" class="right-tab" type="button" data-right-panel="events">
+            Events
+            <span id="eventCount" class="tab-count">0</span>
+          </button>
+        </div>
+
+        <section id="rightPanelDashboard" class="right-content active">
+          <div id="liveStatus" class="dashboard empty-state">Select or start a session.</div>
+        </section>
+
+        <section id="rightPanelArtifacts" class="right-content">
+          <div class="artifacts-view">
+            <aside class="artifacts-sidebar">
+              <div class="panel-toolbar compact">
+                <div>
+                  <p class="label-xs">Artifacts</p>
+                  <h2>Session Files</h2>
+                </div>
+              </div>
+              <div id="artifactsList" class="artifacts-list empty-state">No session selected.</div>
+            </aside>
+
+            <div class="artifact-viewer-pane">
+              <div class="viewer-header">
+                <div>
+                  <p class="label-xs">Viewer</p>
+                  <div id="viewerMeta" class="viewer-filepath">Choose a report, plan, or log file.</div>
+                </div>
+                <div class="viewer-actions">
+                  <button id="closeHelp" class="secondary-button utility-button" type="button" hidden>Back</button>
+                  <button id="openArtifact" class="secondary-button utility-button" type="button" disabled>Open Externally</button>
+                </div>
+              </div>
+              <div id="helpTabs" class="help-tabs" hidden></div>
+              <article id="artifactViewer" class="artifact-viewer empty-state">Artifact content will appear here.</article>
+            </div>
+          </div>
+        </section>
+
+        <section id="rightPanelEvents" class="right-content">
+          <div class="events-view">
+            <div class="events-header">
+              <div>
+                <p class="label-xs">Events</p>
+                <h2>Recent Activity</h2>
+              </div>
+            </div>
+            <div id="eventsTimeline" class="events-list"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
+  <script src="../../node_modules/marked/lib/marked.umd.js"></script>
+  <script src="./time-format.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
+

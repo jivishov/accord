@@ -1,0 +1,58 @@
+{
+  "name": "accord-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Electron wrapper for the Accord PowerShell pipeline.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "smoke": "node test/electron_smoke.mjs",
+    "dist": "electron-builder --win nsis",
+    "release:build": "npm run dist",
+    "release:prepare": "powershell -ExecutionPolicy Bypass -File scripts/prepare-release.ps1",
+    "release:all": "npm run release:build && npm run release:prepare"
+  },
+  "build": {
+    "appId": "com.accord.desktop",
+    "productName": "Accord",
+    "asarUnpack": [
+      "accord.ps1",
+      "plan_for_meta_plan.md",
+      "prompts/**/*",
+      "docs/help/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "accord.ps1",
+      "plan_for_meta_plan.md",
+      "prompts/**/*",
+      "docs/help/**/*",
+      "README.md",
+      "AGENTS.md",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "dompurify": "latest",
+    "marked": "latest"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  }
+}
