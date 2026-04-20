@@ -67,7 +67,11 @@ Three toggle switches in the Configure panel control pipeline behavior:
 
 ### Deliberation Mode
 
-Replaces the standard write-review-fix loop with a collaborative back-and-forth between Claude and Codex. Instead of Codex simply passing or failing the output, both agents take turns "thinking" and "evaluating" until they converge on a solution. Use this for ambiguous tasks, architecture decisions, or when quality matters more than speed.
+Replaces the standard write-review-fix loop with a structured multi-round collaboration. Claude implements and documents its thinking in a thoughts file; Codex evaluates, makes direct edits to the output, and declares a decision. Claude then reviews the feedback and refines if needed. This continues until both agents converge.
+
+The orchestrator enforces the convergence gate: if any CRITICAL or HIGH issues remain in Codex's `Remaining Issues` section, CONVERGED is vetoed and another round is forced — even if Codex declares CONVERGED.
+
+Use this for ambiguous tasks, architecture decisions, or when quality matters more than speed.
 
 ### Skip Plan QC
 
@@ -151,6 +155,8 @@ Then run document mode (optionally with deliberation) to generate a detailed imp
 
 The output is a `CONTINUATION_CYCLE_*.md` file in `cycles/<session_id>/` — a detailed, QC-validated implementation plan with file paths, function signatures, edge cases, and test cases.
 
+Document deliberation enforces four non-negotiable sections in the output: **Quickstart Tutorial** (prerequisites, exact commands), **Frontend Design Notes** (UI cycles only), **QC Lessons Learned**, and **Next Cycle Instructions**. If any are missing, Codex marks a CRITICAL issue and the pipeline forces another round.
+
 ### Stage 2: Implement code from the plan
 
 ```powershell
@@ -213,6 +219,20 @@ Typical files include:
 - plan QC reports
 - `_iteration_history.md`
 - `CONTINUATION_CYCLE_*.md`
+
+For deliberation sessions, a `deliberation/` subfolder holds round-by-round artifacts:
+
+```
+deliberation/
+├── phase0/                          # document deliberation
+│   ├── round1_claude_thoughts.md
+│   ├── round1_codex_evaluation.md
+│   └── deliberation_summary.md      # written at convergence
+└── phase1/                          # code deliberation
+    ├── round1_claude_thoughts.md
+    ├── round1_codex_review.md
+    └── deliberation_summary.md
+```
 
 ## Reading Results
 
